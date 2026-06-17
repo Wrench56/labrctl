@@ -40,4 +40,6 @@ struct labrctl_ctl {
 #define CTL_SZ sizeof(struct labrctl_ctl)
 #define PACKET_SZ sizeof(struct labrctl_packet)
 
+#define DATA_OFFS 6
+
 #endif // LABRCTL_CTL_H
