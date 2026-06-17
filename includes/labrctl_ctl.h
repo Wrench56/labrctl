@@ -17,8 +17,9 @@ typedef uint64_t __u64;
 
 enum labrctl_op {
     LABRCTL_OP_NOP = 0,
-    LABRCTL_OP_RUN = 1,
-    LABRCTL_OP_KILL = 2,
+    LABRCTL_OP_ACK = 1,
+    LABRCTL_OP_RUN = 2,
+    LABRCTL_OP_KILL = 3,
 };
 
 /* Should fit into a single cache-line counting ETH + IP + UDP header */

@@ -19,6 +19,35 @@ extern int bpf_labrctl_submit(void* data, size_t data__sz) __ksym;
 
 static _Atomic __u32 seq_seen = 0;
 
+static __always_inline int ack_tx(
+    struct xdp_md* ctx,
+    struct labrctl_packet* pkt
+)
+{
+    struct ethhdr* eth = (void*) (long) ctx->data;
+    struct iphdr* iph = (struct iphdr*) (eth + 1);
+    struct udphdr* udp = (struct udphdr*) (iph + 1);
+
+    __u8 mac[ETH_ALEN];
+    __builtin_memcpy(mac, eth->h_source, ETH_ALEN);
+    __builtin_memcpy(eth->h_source, eth->h_dest, ETH_ALEN);
+    __builtin_memcpy(eth->h_dest, mac, ETH_ALEN);
+
+    __be32 ip = iph->saddr;
+    iph->saddr = iph->daddr;
+    iph->daddr = ip;
+
+    __be16 port = udp->source;
+    udp->source = udp->dest;
+    udp->dest = port;
+    udp->check = 0;
+
+    pkt->op = LABRCTL_OP_ACK;
+    pkt->arg = 0;
+
+    return XDP_TX;
+}
+
 SEC("xdpfwd")
 int xdp_fwd(struct xdp_md* ctx)
 {
@@ -68,14 +97,18 @@ int xdp_fwd(struct xdp_md* ctx)
         return XDP_PASS;
     }
 
-    __u32 expected = (__u8) (pkt->seq - 1);
-    if (atomic_compare_exchange_strong(&seq_seen, &expected, pkt->seq)) {
-        bpf_labrctl_submit(payload, PACKET_SZ);
+    if (pkt->op == LABRCTL_OP_ACK) {
         return XDP_DROP;
     }
 
+    __u32 expected = (__u8) (pkt->seq - 1);
+    if (atomic_compare_exchange_strong(&seq_seen, &expected, pkt->seq)) {
+        bpf_labrctl_submit(payload, PACKET_SZ);
+        return ack_tx(ctx, pkt);
+    }
+
     if ((__u8) expected == pkt->seq) {
-        return XDP_DROP;
+        return ack_tx(ctx, pkt);
     }
 
     return XDP_DROP;
