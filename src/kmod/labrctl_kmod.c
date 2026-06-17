@@ -55,10 +55,15 @@ static const struct btf_kfunc_id_set labrctl_kfunc_set = {
 static int worker_fn(void* payload)
 {
     struct labrctl_ctl* ctl = payload;
+    __u64* bp = (__u64*) ((__u8*) bufferpage + BREG_START_BYTES);
+
     while (!kthread_should_stop()) {
         switch (ctl->op) {
             case LABRCTL_OP_STORE:
-                op_store(ctl, (__u64*) ((__u8*) bufferpage + BREG_START_BYTES));
+                op_store(ctl, bp);
+                break;
+            case LABRCTL_OP_SPAWN:
+                op_spawn(ctl, bp);
                 break;
             default:
                 pr_err("labrctl: Invalid opcode in worker kthread\n");
