@@ -11,7 +11,10 @@ MODULE_AUTHOR("Mark Devenyi");
 MODULE_DESCRIPTION("labrctl kernel module");
 MODULE_VERSION("0.1");
 
-static struct labrctl_ctl* ctl = { 0 };
+static void* structpage = NULL;
+static struct labrctl_ctl* ctl = NULL;
+static struct labrctl_ctl* thrd_ctl = NULL;
+static struct task_struct* worker_thrd = NULL;
 
 __bpf_kfunc_start_defs();
 
@@ -43,12 +46,32 @@ static const struct btf_kfunc_id_set labrctl_kfunc_set = {
     .set = &labrctl_kfunc_ids,
 };
 
+static int worker_fn(void* payload)
+{
+    struct labrctl_ctl* ctl = payload;
+    while (!kthread_should_stop()) {
+        // TODO: Add K-ops handling here
+        switch (ctl->op) {
+            default:
+                pr_err("labrctl: Invalid opcode in worker kthread\n");
+                return 1;
+        }
+    }
+
+    pr_info("labrctl: Shutting down worker thread\n");
+    return 0;
+}
+
 static int __init labrctl_init(void)
 {
-    ctl = (void*) get_zeroed_page(GFP_KERNEL);
-    if (!ctl) {
+    structpage = (void*) get_zeroed_page(GFP_KERNEL);
+    if (!structpage) {
         return -ENOMEM;
     }
+
+    ctl = (struct labrctl_ctl*) structpage;
+    thrd_ctl = ctl + 1;
+    worker_thrd = (void*) thrd_ctl + 1;
 
     int ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &labrctl_kfunc_set);
     if (ret) {
@@ -57,14 +80,23 @@ static int __init labrctl_init(void)
         return ret;
     }
 
+    /* Dumb Linux legacy convention of calling threads tasks... Why?! */
+    worker_thrd = kthread_run(worker_fn, &thrd_ctl, "labrctl_worker");
+    if (IS_ERR(worker_thrd)) {
+        pr_err("labrctl: Failed to create worker\n");
+        return PTR_ERR(worker_thrd);
+    }
+
     pr_info("labrctl: Module loaded successfully\n");
     return 0;
 }
 
 static void __exit labrctl_exit(void)
 {
-    if (ctl) {
-        free_page((unsigned long) ctl);
+    kthread_stop(worker_thrd);
+
+    if (structpage) {
+        free_page((unsigned long) structpage);
     }
 
     pr_info("labrctl: Module unloaded successfully\n");
