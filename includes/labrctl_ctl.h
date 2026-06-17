@@ -22,17 +22,19 @@ struct labrctl_packet {
     /* Has to be LABRCTL_MAGIC & LABRCTL_VERSION */
     __u16 hdr;
     __u8 op;
-    __u8 arg;
+    __u8 arg[2];
     __u8 seq;
-    __u8 rsvd[13];
+    __u8 data[8];
+    __u8 rsvd[4];
 } __attribute__((packed));
 
 struct labrctl_ctl {
     __u64 epoch;
     __u8 ver;
     __u8 op;
-    __u8 arg;
-    __u8 rsvd[53];
+    __u8 arg[2];
+    __u8 data[8];
+    __u8 rsvd[44];
 } __attribute__((packed));
 
 #define CTL_SZ sizeof(struct labrctl_ctl)

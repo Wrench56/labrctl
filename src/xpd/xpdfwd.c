@@ -43,7 +43,6 @@ static __always_inline int ack_tx(
     udp->check = 0;
 
     pkt->op = LABRCTL_OP_ACK;
-    pkt->arg = 0;
 
     return XDP_TX;
 }
