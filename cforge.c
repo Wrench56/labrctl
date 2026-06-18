@@ -1,5 +1,7 @@
 #include "cforge.h"
 
+#include <string.h>
+
 #define CC_TAG "[" CF_YELLOW "CC" CF_RESET "] "
 #define AR_TAG "[" CF_GREEN "AR" CF_RESET "] "
 #define LD_TAG "[" CF_CYAN "LD" CF_RESET "] "
@@ -20,6 +22,7 @@
 #define XDP_DIR "src/xdp"
 #define XDP_OBJ BUILD_DIR "/xdpfwd.o"
 #define XDP_SECTION "xdp_fwd"
+#define XDP_IFACE ""
 
 CF_CONFIG(bpf)
 {
@@ -249,6 +252,11 @@ CF_TARGET(
 
 CF_TARGET(load_xdp, CF_HELP_STRING("Load XDP program"))
 {
+    if (strlen(XDP_IFACE) == 0) {
+        printf(CC_TAG "No XDP_IFACE definition found!\n");
+        return;
+    }
+
     printf(CC_TAG "Loading XDP: %s on %s\n", XDP_OBJ, XDP_IFACE);
 
     CF_RUN(
@@ -261,6 +269,11 @@ CF_TARGET(load_xdp, CF_HELP_STRING("Load XDP program"))
 
 CF_TARGET(unload_xdp, CF_HELP_STRING("Unload XDP program"))
 {
+    if (strlen(XDP_IFACE) == 0) {
+        printf(CC_TAG "No XDP_IFACE definition found!\n");
+        return;
+    }
+
     printf(CC_TAG "Unloading XDP from %s\n", XDP_IFACE);
 
     CF_RUN("sudo ip link set dev %s xdpgeneric off", XDP_IFACE);
