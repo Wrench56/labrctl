@@ -14,3 +14,6 @@ build/
 
 # Ignore compile_commands.json
 compile_commands.json
+
+# Ignore Python cache
+__pycache__
