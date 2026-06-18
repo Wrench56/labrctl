@@ -1,6 +1,8 @@
 #ifndef LABRCTL_OPS_H
 #define LABRCTL_OPS_H
 
+#define LABRCTL_OP_USERSPACE 128
+
 enum labrctl_op {
     LABRCTL_OP_NOP = 0,
     LABRCTL_OP_ACK = 1,

@@ -19,25 +19,36 @@ static struct labrctl_ctl* ctl = NULL;
 static struct labrctl_ctl* thrd_ctl = NULL;
 
 static struct task_struct* worker_thrd = { 0 };
+static DECLARE_WAIT_QUEUE_HEAD(worker_wq);
 
 __bpf_kfunc_start_defs();
 
 __bpf_kfunc int bpf_labrctl_submit(void* data, size_t data__sz)
 {
     const __u8* payload = data;
-    if (data__sz < 2) {
+    if (data__sz < DATA_OFFS + 8) {
         return -EINVAL;
     }
 
+    __u8 op = READ_ONCE(payload[2]);
+    struct labrctl_ctl* cctl;
+    if (op & LABRCTL_OP_USERSPACE) {
+        cctl = ctl;
+    } else {
+        cctl = thrd_ctl;
+    }
+
     /* XDP passes raw pointers to packets. Copy payload or crash! */
-    WRITE_ONCE(ctl->ver, payload[1]);
-    WRITE_ONCE(ctl->op, payload[2]);
-    WRITE_ONCE(ctl->arg[0], payload[3]);
-    WRITE_ONCE(ctl->arg[1], payload[4]);
+    WRITE_ONCE(cctl->ver, payload[1]);
+    WRITE_ONCE(cctl->op, op);
+    WRITE_ONCE(cctl->arg[0], payload[3]);
+    WRITE_ONCE(cctl->arg[1], payload[4]);
+    __builtin_memcpy(cctl->data, &payload[DATA_OFFS], sizeof(__u8[8]));
+    smp_store_release(&cctl->epoch, READ_ONCE(cctl->epoch) + 1);
 
-    __builtin_memcpy(ctl->data, &payload[DATA_OFFS], sizeof(__u8[8]));
-    smp_store_release(&ctl->epoch, READ_ONCE(ctl->epoch) + 1);
-
+    if (!(op & LABRCTL_OP_USERSPACE)) {
+        wake_up_interruptible(&worker_wq);
+    }
     return 0;
 }
 
@@ -56,9 +67,22 @@ static int worker_fn(void* payload)
 {
     struct labrctl_ctl* ctl = payload;
     __u64* bp = (__u64*) ((__u8*) bufferpage + BREG_START_BYTES);
+    __u32 last = smp_load_acquire(&ctl->epoch);
 
     while (!kthread_should_stop()) {
-        switch (ctl->op) {
+        wait_event_interruptible(
+            worker_wq,
+            smp_load_acquire(&ctl->epoch) != last || kthread_should_stop()
+        );
+
+        if (kthread_should_stop()) {
+            break;
+        }
+
+        last = smp_load_acquire(&ctl->epoch);
+        switch (READ_ONCE(ctl->op)) {
+            case LABRCTL_OP_NOP:
+                break;
             case LABRCTL_OP_STORE:
                 op_store(ctl, bp);
                 break;
@@ -69,8 +93,8 @@ static int worker_fn(void* payload)
                 op_kill(ctl, bp);
                 break;
             default:
-                pr_err("labrctl: Invalid opcode in worker kthread\n");
-                return 1;
+                pr_warn("labrctl: unknown op %u\n", READ_ONCE(ctl->op));
+                break;
         }
     }
 
