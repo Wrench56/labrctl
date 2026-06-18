@@ -1,4 +1,4 @@
-#include "liblabrctl.h"
+#include "labrctl_ctl.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -7,13 +7,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-const char* labrctl_version(void)
+const char* labrctl_ctl_version(void)
 {
     return LIBLABRCTL_VERSION;
 }
 
-int labrctl_open(
-    struct labrctl_client* c,
+int labrctl_ctl_open(
+    struct labrctl_ctl_client* c,
     const char* server,
     uint16_t port,
     unsigned timeout_ms,
@@ -24,7 +24,7 @@ int labrctl_open(
         return -EINVAL;
     }
 
-    *c = (struct labrctl_client) { 0 };
+    *c = (struct labrctl_ctl_client) { 0 };
     c->seq = 1;
     c->retries = retries ? retries : 4;
     c->timeout.tv_sec = timeout_ms / 1000;
@@ -67,7 +67,7 @@ int labrctl_open(
     return 0;
 }
 
-void labrctl_close(struct labrctl_client* c)
+void labrctl_ctl_close(struct labrctl_ctl_client* c)
 {
     if (c != NULL && c->fd >= 0) {
         close(c->fd);
@@ -76,7 +76,7 @@ void labrctl_close(struct labrctl_client* c)
 }
 
 static void build(
-    struct labrctl_packet* pkt,
+    struct labrctl_ctl_packet* pkt,
     uint8_t op,
     uint8_t seq,
     const uint8_t arg[2],
@@ -96,15 +96,15 @@ static void build(
 }
 
 static int exchange(
-    struct labrctl_client* c,
+    struct labrctl_ctl_client* c,
     uint8_t op,
     uint8_t seq,
     const uint8_t arg[2],
     const uint8_t data[8],
-    struct labrctl_packet* reply
+    struct labrctl_ctl_packet* reply
 )
 {
-    struct labrctl_packet pkt;
+    struct labrctl_ctl_packet pkt;
     build(&pkt, op, seq, arg, data);
 
     if (send(c->fd, &pkt, sizeof(pkt), 0) < 0) {
@@ -125,8 +125,8 @@ static int exchange(
     return 1;
 }
 
-int labrctl_command(
-    struct labrctl_client* c,
+int labrctl_ctl_command(
+    struct labrctl_ctl_client* c,
     uint8_t op,
     const uint8_t arg[2],
     const uint8_t data[8]
@@ -137,7 +137,7 @@ int labrctl_command(
     }
 
     for (unsigned attempt = 0; attempt < c->retries; attempt++) {
-        struct labrctl_packet reply;
+        struct labrctl_ctl_packet reply;
         int r = exchange(c, op, c->seq, arg, data, &reply);
         if (r < 0) {
             return r;
@@ -159,9 +159,9 @@ int labrctl_command(
     return -ETIMEDOUT;
 }
 
-int labrctl_resync(struct labrctl_client* c)
+int labrctl_ctl_resync(struct labrctl_ctl_client* c)
 {
-    int ret = labrctl_command(c, LABRCTL_OP_RESEQ, NULL, NULL);
+    int ret = labrctl_ctl_command(c, LABRCTL_OP_RESEQ, NULL, NULL);
     c->seq = 0;
 
     return ret;
