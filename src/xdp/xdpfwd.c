@@ -7,14 +7,13 @@
 #include <linux/in.h>
 #include <linux/ip.h>
 #include <linux/udp.h>
-#include <stddef.h>
 
 #include "labrctl_ctl.h"
 
 #define ETHHLEN (sizeof(struct ethhdr))
 #define UDPHLEN (sizeof(struct udphdr))
 
-extern int bpf_labrctl_submit(void* data, size_t data__sz) __ksym;
+extern int bpf_labrctl_submit(void* data, __u64 data__sz) __ksym;
 
 static __u64 seq_seen = 0;
 

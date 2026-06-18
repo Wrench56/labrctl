@@ -23,7 +23,7 @@ static DECLARE_WAIT_QUEUE_HEAD(worker_wq);
 
 __bpf_kfunc_start_defs();
 
-__bpf_kfunc int bpf_labrctl_submit(void* data, size_t data__sz)
+__bpf_kfunc int bpf_labrctl_submit(void* data, __u64 data__sz)
 {
     const __u8* payload = data;
     if (data__sz < DATA_OFFS + 8) {
