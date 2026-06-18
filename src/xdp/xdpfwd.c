@@ -112,7 +112,7 @@ int xdp_fwd(struct xdp_md* ctx)
 
     if (pkt->op == LABRCTL_OP_RESEQ) {
         __sync_lock_test_and_set(&seq_seen, 0);
-        return XDP_DROP;
+        return ack_tx(ctx);
     }
 
     __u64 expected = (__u8) (pkt->seq - 1);
