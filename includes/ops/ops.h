@@ -3,6 +3,7 @@
 
 #if defined(__KERNEL__)
 
+#include "ops/op_kill.h"
 #include "ops/op_spawn.h"
 #include "ops/op_store.h"
 

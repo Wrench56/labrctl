@@ -65,6 +65,9 @@ static int worker_fn(void* payload)
             case LABRCTL_OP_SPAWN:
                 op_spawn(ctl, bp);
                 break;
+            case LABRCTL_OP_KILL:
+                op_kill(ctl, bp);
+                break;
             default:
                 pr_err("labrctl: Invalid opcode in worker kthread\n");
                 return 1;
