@@ -7,6 +7,7 @@
 #include <linux/pagemap.h>
 
 #include "labrctl_ctl.h"
+#include "mmap.h"
 #include "ops/ops.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
@@ -14,7 +15,9 @@ MODULE_AUTHOR("Mark Devenyi");
 MODULE_DESCRIPTION("labrctl kernel module");
 MODULE_VERSION("0.1");
 
-static void* bufferpage = NULL;
+void* bufferpage = NULL;
+static int labrctl_major;
+
 static struct labrctl_ctl* ctl = NULL;
 static struct labrctl_ctl* thrd_ctl = NULL;
 
@@ -61,6 +64,11 @@ BTF_KFUNCS_END(labrctl_kfunc_ids);
 static const struct btf_kfunc_id_set labrctl_kfunc_set = {
     .owner = THIS_MODULE,
     .set = &labrctl_kfunc_ids,
+};
+
+static const struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .mmap = ummap,
 };
 
 static int worker_fn(void* payload)
@@ -134,18 +142,28 @@ static int __init labrctl_init(void)
     ctl = (struct labrctl_ctl*) bufferpage;
     thrd_ctl = ctl + 1;
 
-    int ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &labrctl_kfunc_set);
-    if (ret) {
-        free_bufferpage();
-        pr_err("labrctl: Module failed to load while loading XDP\n");
-        return ret;
-    }
-
     /* Dumb Linux legacy convention of calling threads tasks... Why?! */
     worker_thrd = kthread_run(worker_fn, thrd_ctl, "labrctl_worker");
     if (IS_ERR(worker_thrd)) {
         pr_err("labrctl: Failed to create worker\n");
+        free_bufferpage();
         return PTR_ERR(worker_thrd);
+    }
+
+    labrctl_major = register_chrdev(0, LABRCTL_DEVNAME, &fops);
+    if (labrctl_major < 0) {
+        pr_err("labrctl: Could not allocate chdriver");
+        kthread_stop(worker_thrd);
+        free_bufferpage();
+        return labrctl_major;
+    }
+
+    int ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &labrctl_kfunc_set);
+    if (ret) {
+        pr_err("labrctl: Module failed to load while loading XDP\n");
+        kthread_stop(worker_thrd);
+        free_bufferpage();
+        return ret;
     }
 
     pr_info("labrctl: Module loaded successfully\n");
@@ -154,6 +172,8 @@ static int __init labrctl_init(void)
 
 static void __exit labrctl_exit(void)
 {
+    unregister_chrdev(labrctl_major, LABRCTL_DEVNAME);
+
     kthread_stop(worker_thrd);
     free_bufferpage();
 
