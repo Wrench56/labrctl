@@ -9,6 +9,7 @@ enum labrctl_op {
     LABRCTL_OP_STORE = 2,
     LABRCTL_OP_SPAWN = 3,
     LABRCTL_OP_KILL = 4,
+    LABRCTL_OP_RESEQ = 5,
 };
 
 #endif // LABRCTL_OPS_H

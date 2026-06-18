@@ -112,6 +112,11 @@ int xdp_fwd(struct xdp_md* ctx)
         return XDP_DROP;
     }
 
+    if (pkt->op == LABRCTL_OP_RESEQ) {
+        seq_seen = 0;
+        return XDP_DROP;
+    }
+
     __u64 expected = (__u8) (pkt->seq - 1);
     if (atomic_compare_exchange_strong(&seq_seen, &expected, pkt->seq)) {
         bpf_labrctl_submit(payload, PACKET_SZ);
