@@ -17,9 +17,9 @@
 #define LIB BUILD_DIR "/liblabrctl.a"
 
 #define BPF_CLANG "clang"
-#define XPD_DIR "src/xpd"
-#define XPD_OBJ BUILD_DIR "/xpdfwd.o"
-#define XPD_SECTION "xdp_fwd"
+#define XDP_DIR "src/xdp"
+#define XDP_OBJ BUILD_DIR "/xdpfwd.o"
+#define XDP_SECTION "xdp_fwd"
 
 CF_CONFIG(bpf)
 {
@@ -91,7 +91,7 @@ CF_TARGET(
     CF_WITH_CONFIG(release),
     CF_DEPENDS(kmod),
     CF_DEPENDS(lib),
-    CF_DEPENDS(xpd),
+    CF_DEPENDS(xdp),
     CF_HELP_STRING("Build everything")
 )
 {
@@ -207,22 +207,22 @@ CF_TARGET(lib_archive, CF_HIDDEN)
 }
 
 CF_TARGET(
-    xpd,
+    xdp,
     CF_WITH_CONFIG(release),
-    CF_HELP_STRING("Build xpd XDP/eBPF object")
+    CF_HELP_STRING("Build XDP/eBPF object")
 )
 {
     bool rebuild = false;
 
     CF_MKDIR(BUILD_DIR);
 
-    for CF_GLOBS_EACH(XPD_DIR "/*", file) {
+    for CF_GLOBS_EACH(XDP_DIR "/*", file) {
         if (CF_FILE_NOT_UTD(file)) {
             rebuild = true;
         }
     }
 
-    if (CF_FILE_NOT_UTD(XPD_OBJ)) {
+    if (CF_FILE_NOT_UTD(XDP_OBJ)) {
         rebuild = true;
     }
 
@@ -230,38 +230,38 @@ CF_TARGET(
         return;
     }
 
-    printf(CC_TAG "%s\n", XPD_DIR "/xpdfwd.c");
+    printf(CC_TAG "%s\n", XDP_DIR "/xdpfwd.c");
 
     CF_RUN(
-        "%s %s -c %s/xpdfwd.c -o %s",
+        "%s %s -c %s/xdpfwd.c -o %s",
         CF_ENV(bpfcc),
         CF_ENV(bpfflags),
-        XPD_DIR,
-        XPD_OBJ
+        XDP_DIR,
+        XDP_OBJ
     );
 
-    for CF_GLOBS_EACH(XPD_DIR "/*", file) {
+    for CF_GLOBS_EACH(XDP_DIR "/*", file) {
         CF_FILE_MARK_UTD(file);
     }
 
-    CF_FILE_MARK_UTD(XPD_OBJ);
+    CF_FILE_MARK_UTD(XDP_OBJ);
 }
 
 CF_TARGET(load_xdp, CF_HELP_STRING("Load XDP program"))
 {
-    printf(CC_TAG "Loading XDP: %s on %s\n", XPD_OBJ, XPD_IFACE);
+    printf(CC_TAG "Loading XDP: %s on %s\n", XDP_OBJ, XDP_IFACE);
 
     CF_RUN(
         "sudo ip link set dev %s xdpgeneric obj %s sec %s",
-        XPD_IFACE,
-        XPD_OBJ,
-        XPD_SECTION
+        XDP_IFACE,
+        XDP_OBJ,
+        XDP_SECTION
     );
 }
 
 CF_TARGET(unload_xdp, CF_HELP_STRING("Unload XDP program"))
 {
-    printf(CC_TAG "Unloading XDP from %s\n", XPD_IFACE);
+    printf(CC_TAG "Unloading XDP from %s\n", XDP_IFACE);
 
-    CF_RUN("sudo ip link set dev %s xdpgeneric off", XPD_IFACE);
+    CF_RUN("sudo ip link set dev %s xdpgeneric off", XDP_IFACE);
 }
