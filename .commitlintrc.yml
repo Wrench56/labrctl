@@ -23,7 +23,8 @@ rules:
       - license
       - kmod
       - xdp
-      - lib
+      - agent
+      - ctl
   subject-empty:
     level: error
   type:
