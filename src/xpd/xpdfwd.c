@@ -17,7 +17,7 @@
 
 extern int bpf_labrctl_submit(void* data, size_t data__sz) __ksym;
 
-static _Atomic __u32 seq_seen = 0;
+static _Atomic __u64 seq_seen = 0;
 
 static __always_inline int ack_tx(
     struct xdp_md* ctx,
@@ -100,7 +100,7 @@ int xdp_fwd(struct xdp_md* ctx)
         return XDP_DROP;
     }
 
-    __u32 expected = (__u8) (pkt->seq - 1);
+    __u64 expected = (__u8) (pkt->seq - 1);
     if (atomic_compare_exchange_strong(&seq_seen, &expected, pkt->seq)) {
         bpf_labrctl_submit(payload, PACKET_SZ);
         return ack_tx(ctx, pkt);
