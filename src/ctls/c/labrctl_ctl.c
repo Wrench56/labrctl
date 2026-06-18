@@ -9,7 +9,7 @@
 
 const char* labrctl_ctl_version(void)
 {
-    return LIBLABRCTL_VERSION;
+    return LABRCTL_VERSION_STR;
 }
 
 int labrctl_ctl_open(

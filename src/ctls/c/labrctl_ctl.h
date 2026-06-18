@@ -5,13 +5,16 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-#define LIBLABRCTL_MAJOR 0
-#define LIBLABRCTL_MINOR 1
+#define LABRCTL_MAJOR 0
+#define LABRCTL_MINOR 1
+#define LABRCTL_MAGIC 0x4C
+#define LABRCTL_VERSION 0x00
+#define LABRCTL_PORT 19552
 
-#define LIBLABRCTL_STR1(x) #x
-#define LIBLABRCTL_STR(x) LIBLABRCTL_STR1(x)
-#define LIBLABRCTL_VERSION                                                     \
-    LIBLABRCTL_STR(LIBLABRCTL_MAJOR) "." LIBLABRCTL_STR(LIBLABRCTL_MINOR)
+#define LABRCTL_STR1(x) #x
+#define LABRCTL_STR(x) LABRCTL_STR1(x)
+#define LABRCTL_VERSION_STR                                                    \
+    LABRCTL_STR(LABRCTL_MAJOR) "." LABRCTL_STR(LABRCTL_MINOR)
 
 enum labrctl_op {
     LABRCTL_OP_NOP = 0,
