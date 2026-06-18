@@ -7,8 +7,7 @@
 #include <linux/in.h>
 #include <linux/ip.h>
 #include <linux/udp.h>
-
-#include <stdatomic.h>
+#include <stddef.h>
 
 #include "labrctl_ctl.h"
 
@@ -17,7 +16,7 @@
 
 extern int bpf_labrctl_submit(void* data, size_t data__sz) __ksym;
 
-static _Atomic __u64 seq_seen = 0;
+static __u64 seq_seen = 0;
 
 static __always_inline int ack_tx(struct xdp_md* ctx)
 {
@@ -113,12 +112,12 @@ int xdp_fwd(struct xdp_md* ctx)
     }
 
     if (pkt->op == LABRCTL_OP_RESEQ) {
-        seq_seen = 0;
+        __sync_lock_test_and_set(&seq_seen, 0);
         return XDP_DROP;
     }
 
     __u64 expected = (__u8) (pkt->seq - 1);
-    if (atomic_compare_exchange_strong(&seq_seen, &expected, pkt->seq)) {
+    if (__sync_val_compare_and_swap(&seq_seen, expected, pkt->seq)) {
         bpf_labrctl_submit(payload, PACKET_SZ);
         return ack_tx(ctx);
     }
