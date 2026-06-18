@@ -67,7 +67,7 @@ static int worker_fn(void* payload)
 {
     struct labrctl_ctl* ctl = payload;
     __u64* bp = (__u64*) ((__u8*) bufferpage + BREG_START_BYTES);
-    __u32 last = smp_load_acquire(&ctl->epoch);
+    __u64 last = smp_load_acquire(&ctl->epoch);
 
     while (!kthread_should_stop()) {
         wait_event_interruptible(
@@ -142,7 +142,7 @@ static int __init labrctl_init(void)
     }
 
     /* Dumb Linux legacy convention of calling threads tasks... Why?! */
-    worker_thrd = kthread_run(worker_fn, &thrd_ctl, "labrctl_worker");
+    worker_thrd = kthread_run(worker_fn, thrd_ctl, "labrctl_worker");
     if (IS_ERR(worker_thrd)) {
         pr_err("labrctl: Failed to create worker\n");
         return PTR_ERR(worker_thrd);
