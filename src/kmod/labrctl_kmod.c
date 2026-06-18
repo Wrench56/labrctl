@@ -110,7 +110,7 @@ static void free_bufferpage(void)
 
     struct page* page_struct = virt_to_page(bufferpage);
     lock_page(page_struct);
-    SetPageReclaim(page_struct);
+    ClearPageReserved(page_struct);
     put_page(page_struct);
     unlock_page(page_struct);
 
@@ -128,7 +128,7 @@ static int __init labrctl_init(void)
     lock_page(page_struct);
     get_page(page_struct);
     /* Undocumented. Please do what I think you do... */
-    SetPagePinned(page_struct);
+    SetPageReserved(page_struct);
     unlock_page(page_struct);
 
     ctl = (struct labrctl_ctl*) bufferpage;
