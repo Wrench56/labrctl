@@ -21,7 +21,8 @@
 #define XPD_OBJ BUILD_DIR "/xpdfwd.o"
 #define XPD_SECTION "xdp_fwd"
 
-CF_CONFIG(bpf) {
+CF_CONFIG(bpf)
+{
     CF_SET_ENV(bpfcc, BPF_CLANG);
     CF_SET_ENV(
         bpfflags,
@@ -33,13 +34,15 @@ CF_CONFIG(bpf) {
     );
 }
 
-CF_CONFIG(base) {
+CF_CONFIG(base)
+{
     CF_SET_ENV(cc, "cc");
     CF_SET_ENV(ar, "ar");
     CF_SET_ENV(ldflags, "");
 }
 
-CF_CONFIG(release) {
+CF_CONFIG(release)
+{
     CF_CONFIG_EXTENDS(base);
     CF_CONFIG_EXTENDS(bpf);
 
@@ -52,7 +55,8 @@ CF_CONFIG(release) {
     );
 }
 
-CF_CONFIG(debug) {
+CF_CONFIG(debug)
+{
     CF_CONFIG_EXTENDS(base);
     CF_CONFIG_EXTENDS(bpf);
 
@@ -65,7 +69,8 @@ CF_CONFIG(debug) {
     );
 }
 
-static void compile_c_dir(const char* src_glob, const char* build_dir) {
+static void compile_c_dir(const char* src_glob, const char* build_dir)
+{
     CF_MKDIR(build_dir);
 
     for CF_GLOBS_EACH(src_glob, in) {
@@ -73,13 +78,7 @@ static void compile_c_dir(const char* src_glob, const char* build_dir) {
 
         if (CF_FILE_NOT_UTD(in) || CF_FILE_NOT_UTD(out)) {
             printf(CC_TAG "%s\n", in);
-            CF_RUNP(
-                "%s %s -c %s -o %s",
-                CF_ENV(cc),
-                CF_ENV(cflags),
-                in,
-                out
-            );
+            CF_RUNP("%s %s -c %s -o %s", CF_ENV(cc), CF_ENV(cflags), in, out);
 
             CF_FILE_MARK_UTDP(in);
             CF_FILE_MARK_UTDP(out);
@@ -94,11 +93,13 @@ CF_TARGET(
     CF_DEPENDS(lib),
     CF_DEPENDS(xpd),
     CF_HELP_STRING("Build everything")
-) {
+)
+{
     CF_NOP();
 }
 
-CF_TARGET(clean, CF_HELP_STRING("Remove build artifacts")) {
+CF_TARGET(clean, CF_HELP_STRING("Remove build artifacts"))
+{
     CF_RM(BUILD_DIR);
 }
 
@@ -106,7 +107,8 @@ CF_TARGET(
     kmod,
     CF_WITH_CONFIG(release),
     CF_HELP_STRING("Build the kernel module")
-) {
+)
+{
     bool rebuild = false;
 
     for CF_GLOBS_EACH(KMOD_DIR "/*", file) {
@@ -155,17 +157,14 @@ CF_TARGET(
     CF_FILE_MARK_UTD(BUILD_DIR "/" KMOD_KO);
 }
 
-CF_TARGET(
-    insert,
-    CF_DEPENDS(remove),
-    CF_DEPENDS(kmod),
-    CF_HELP_STRING("Insert kernel module")
-) {
+CF_TARGET(insert, CF_DEPENDS(remove), CF_HELP_STRING("Insert kernel module"))
+{
     printf(KO_TAG "Inserting module: %s\n", KMOD_KO);
     CF_RUN("sudo insmod %s/%s", BUILD_DIR, KMOD_KO);
 }
 
-CF_TARGET(remove, CF_HELP_STRING("Remove kernel module")) {
+CF_TARGET(remove, CF_HELP_STRING("Remove kernel module"))
+{
     const char* lsmod_log = BUILD_DIR "/lsmod.log";
 
     CF_MKDIR(BUILD_DIR);
@@ -185,15 +184,18 @@ CF_TARGET(
     CF_DEPENDS(lib_compile),
     CF_DEPENDS(lib_archive),
     CF_HELP_STRING("Build userspace static library")
-) {
+)
+{
     CF_NOP();
 }
 
-CF_TARGET(lib_compile, CF_HIDDEN) {
+CF_TARGET(lib_compile, CF_HIDDEN)
+{
     compile_c_dir(LIB_DIR "/*.c", LIB_BUILD_DIR);
 }
 
-CF_TARGET(lib_archive, CF_HIDDEN) {
+CF_TARGET(lib_archive, CF_HIDDEN)
+{
     if (CF_FILE_NOT_UTD(LIB)) {
         char* objs = CF_JOIN_GLOB(CF_GLOB(LIB_BUILD_DIR "/*.o"), " ");
 
@@ -208,7 +210,8 @@ CF_TARGET(
     xpd,
     CF_WITH_CONFIG(release),
     CF_HELP_STRING("Build xpd XDP/eBPF object")
-) {
+)
+{
     bool rebuild = false;
 
     CF_MKDIR(BUILD_DIR);
@@ -242,4 +245,23 @@ CF_TARGET(
     }
 
     CF_FILE_MARK_UTD(XPD_OBJ);
+}
+
+CF_TARGET(load_xdp, CF_HELP_STRING("Load XDP program"))
+{
+    printf(CC_TAG "Loading XDP: %s on %s\n", XPD_OBJ, XPD_IFACE);
+
+    CF_RUN(
+        "sudo ip link set dev %s xdpgeneric obj %s sec %s",
+        XPD_IFACE,
+        XPD_OBJ,
+        XPD_SECTION
+    );
+}
+
+CF_TARGET(unload_xdp, CF_HELP_STRING("Unload XDP program"))
+{
+    printf(CC_TAG "Unloading XDP from %s\n", XPD_IFACE);
+
+    CF_RUN("sudo ip link set dev %s xdpgeneric off", XPD_IFACE);
 }
