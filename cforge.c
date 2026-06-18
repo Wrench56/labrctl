@@ -21,7 +21,7 @@
 #define BPF_CLANG "clang"
 #define XDP_DIR "src/xdp"
 #define XDP_OBJ BUILD_DIR "/xdpfwd.o"
-#define XDP_SECTION "xdp_fwd"
+#define XDP_SECTION "xdpfwd"
 #define XDP_IFACE ""
 
 CF_CONFIG(bpf)
