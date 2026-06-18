@@ -13,6 +13,7 @@
 #define KMOD_KO KMOD_NAME ".ko"
 #define KMOD_DIR "src/kmod"
 #define KMOD_BUILD_DIR BUILD_DIR "/kmod"
+#define KMOD_DEV_PATH "/dev/" KMOD_NAME
 
 #define LIB_DIR "src/lib"
 #define LIB_BUILD_DIR BUILD_DIR "/lib"
@@ -164,6 +165,19 @@ CF_TARGET(insert, CF_DEPENDS(remove), CF_HELP_STRING("Insert kernel module"))
 {
     printf(KO_TAG "Inserting module: %s\n", KMOD_KO);
     CF_RUN("sudo insmod %s/%s", BUILD_DIR, KMOD_KO);
+
+    printf(KO_TAG "Creating device node: %s\n", KMOD_DEV_PATH);
+    CF_RUN(
+        "major=$(awk '$2 == \"%s\" { print $1 }' /proc/devices); "
+        "test -n \"$major\"; "
+        "sudo rm -f %s; "
+        "sudo mknod %s c \"$major\" 0; "
+        "sudo chmod 666 %s",
+        KMOD_NAME,
+        KMOD_DEV_PATH,
+        KMOD_DEV_PATH,
+        KMOD_DEV_PATH
+    );
 }
 
 CF_TARGET(remove, CF_HELP_STRING("Remove kernel module"))
@@ -178,6 +192,7 @@ CF_TARGET(remove, CF_HELP_STRING("Remove kernel module"))
     }
 
     printf(KO_TAG "Currently inserted: %s", ret);
+    CF_RUN("sudo rm -f %s", KMOD_DEV_PATH);
     CF_RUN("sudo rmmod %s", KMOD_NAME);
 }
 
