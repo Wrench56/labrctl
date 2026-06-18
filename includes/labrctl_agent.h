@@ -1,6 +1,8 @@
 #ifndef LABRCTL_AGENT_H
 #define LABRCTL_AGENT_H
 
+#include "labrctl_ctl.h"
+
 #define LIBLABRCTL_MAJOR 0
 #define LIBLABRCTL_MINOR 1
 
@@ -10,5 +12,6 @@
     LIBLABRCTL_STR(LIBLABRCTL_MAJOR) "." LIBLABRCTL_STR(LIBLABRCTL_MINOR)
 
 const char* labrctl_agent_version(void);
+struct labrctl_ctl* loadctl(void);
 
 #endif // LABRCTL_AGENT_H
