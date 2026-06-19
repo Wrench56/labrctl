@@ -25,10 +25,11 @@ assert PACKET_SZ == 18, f"packet is {PACKET_SZ} bytes, expected 18"
 class Op(IntEnum):
     NOP = 0x00
     ACK = 0x01
-    STORE = 0x02
-    SPAWN = 0x03
-    KILL = 0x04
-    RESEQ = 0x05
+    RESEQ = 0x02
+    STORE = 0x03
+    FETCH = 0x04
+    SPAWN = 0x05
+    KILL = 0x06
     GPUSIG0 = 0x80
     GPUSIG1 = 0x81
     GPUSIG2 = 0x82
@@ -154,6 +155,27 @@ class LabrctlClient:
 
         self._log("resync failed")
         raise Timeout("resync failed")
+
+    def fetch(self, reg: int, off: int = 0) -> int:
+        arg = bytes([reg & 0xFF, off & 0xFF])
+
+        for attempt in range(1, self.retries + 1):
+            reply = self._exchange(Op.FETCH, self.seq, arg, b"\x00" * 8)
+            if reply is None:
+                self._log(f"   timeout {attempt}/{self.retries}, retransmit seq={self.seq}")
+                continue
+
+            if reply.op != Op.ACK:
+                raise LabrctlError(f"reply op {reply.op:#04x} is not ACK {int(Op.ACK):#04x}")
+
+            if reply.seq != (self.seq & 0xFF):
+                self._log(f"   stale ack seq={reply.seq} (want {self.seq & 0xFF}), ignoring")
+                continue
+
+            self.seq = (self.seq + 1) & 0xFF
+            return int.from_bytes(reply.data, "little")
+
+        raise Timeout(f"no ACK for FETCH seq={self.seq} after {self.retries} tries")
 
     def __getattr__(self, name: str):
         try:

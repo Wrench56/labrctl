@@ -166,3 +166,39 @@ int labrctl_ctl_resync(struct labrctl_ctl_client* c)
 
     return ret;
 }
+
+int labrctl_ctl_fetch(
+    struct labrctl_ctl_client* c,
+    uint8_t reg,
+    uint8_t off,
+    uint64_t* out
+)
+{
+    if (c == NULL || c->fd < 0 || out == NULL) {
+        return -EINVAL;
+    }
+
+    uint8_t arg[2] = { reg, off };
+    for (unsigned attempt = 0; attempt < c->retries; attempt++) {
+        struct labrctl_ctl_packet reply;
+        int r = exchange(c, LABRCTL_OP_FETCH, c->seq, arg, NULL, &reply);
+        if (r < 0) {
+            return r;
+        }
+        if (r == 0) {
+            continue;
+        }
+        if (reply.op != LABRCTL_OP_ACK) {
+            return -EBADMSG;
+        }
+        if (reply.seq != c->seq) {
+            continue;
+        }
+
+        memcpy(out, reply.data, sizeof(*out));
+        c->seq++;
+        return 0;
+    }
+
+    return -ETIMEDOUT;
+}

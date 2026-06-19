@@ -19,10 +19,11 @@
 enum labrctl_op {
     LABRCTL_OP_NOP = 0,
     LABRCTL_OP_ACK = 1,
-    LABRCTL_OP_STORE = 2,
-    LABRCTL_OP_SPAWN = 3,
-    LABRCTL_OP_KILL = 4,
-    LABRCTL_OP_RESEQ = 5,
+    LABRCTL_OP_RESEQ = 2,
+    LABRCTL_OP_STORE = 3,
+    LABRCTL_OP_FETCH = 4,
+    LABRCTL_OP_SPAWN = 5,
+    LABRCTL_OP_KILL = 6,
     LABRCTL_OP_GPUSIG0 = 128,
     LABRCTL_OP_GPUSIG1 = 129,
     LABRCTL_OP_GPUSIG2 = 130,
@@ -63,6 +64,13 @@ int labrctl_ctl_command(
 );
 
 int labrctl_ctl_resync(struct labrctl_ctl_client* c);
+
+int labrctl_ctl_fetch(
+    struct labrctl_ctl_client* c,
+    uint8_t reg,
+    uint8_t off,
+    uint64_t* out
+);
 
 const char* labrctl_ctl_version(void);
 
