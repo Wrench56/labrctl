@@ -1,5 +1,6 @@
 #include "cforge.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #define CC_TAG "[" CF_YELLOW "CC" CF_RESET "] "
@@ -15,9 +16,13 @@
 #define KMOD_BUILD_DIR BUILD_DIR "/kmod"
 #define KMOD_DEV_PATH "/dev/" KMOD_NAME
 
-#define LIB_DIR "src/lib"
-#define LIB_BUILD_DIR BUILD_DIR "/lib"
-#define LIB BUILD_DIR "/liblabrctl.a"
+#define CTL_DIR "src/ctls/c"
+#define CTL_BUILD_DIR BUILD_DIR "/ctl"
+#define CTL_LIB BUILD_DIR "/liblabrctl_ctl.a"
+
+#define AGENT_DIR "src/agent"
+#define AGENT_BUILD_DIR BUILD_DIR "/agent"
+#define AGENT_LIB BUILD_DIR "/liblabrctl_agent.a"
 
 #define BPF_CLANG "clang"
 #define XDP_DIR "src/xdp"
@@ -78,7 +83,10 @@ static void compile_c_dir(const char* src_glob, const char* build_dir)
     CF_MKDIR(build_dir);
 
     for CF_GLOBS_EACH(src_glob, in) {
-        char* out = CF_MAP(in, CF_MAP_EXT("o"), CF_MAP_PARENT(BUILD_DIR));
+        char out_dir[256];
+        snprintf(out_dir, sizeof(out_dir), "%s/", build_dir);
+
+        char* out = CF_MAP(in, CF_MAP_EXT("o"), CF_MAP_DIRS(out_dir));
 
         if (CF_FILE_NOT_UTD(in) || CF_FILE_NOT_UTD(out)) {
             printf(CC_TAG "%s\n", in);
@@ -94,7 +102,8 @@ CF_TARGET(
     all,
     CF_WITH_CONFIG(release),
     CF_DEPENDS(kmod),
-    CF_DEPENDS(lib),
+    CF_DEPENDS(ctl),
+    CF_DEPENDS(agent),
     CF_DEPENDS(xdp),
     CF_HELP_STRING("Build everything")
 )
@@ -197,30 +206,58 @@ CF_TARGET(remove, CF_HELP_STRING("Remove kernel module"))
 }
 
 CF_TARGET(
-    lib,
+    ctl,
     CF_WITH_CONFIG(release),
-    CF_DEPENDS(lib_compile),
-    CF_DEPENDS(lib_archive),
-    CF_HELP_STRING("Build userspace static library")
+    CF_DEPENDS(ctl_compile),
+    CF_DEPENDS(ctl_archive),
+    CF_HELP_STRING("Build userspace ctl static library")
 )
 {
     CF_NOP();
 }
 
-CF_TARGET(lib_compile, CF_HIDDEN)
+CF_TARGET(ctl_compile, CF_HIDDEN)
 {
-    compile_c_dir(LIB_DIR "/*.c", LIB_BUILD_DIR);
+    compile_c_dir(CTL_DIR "/*.c", CTL_BUILD_DIR);
 }
 
-CF_TARGET(lib_archive, CF_HIDDEN)
+CF_TARGET(ctl_archive, CF_HIDDEN)
 {
-    if (CF_FILE_NOT_UTD(LIB)) {
-        char* objs = CF_JOIN_GLOB(CF_GLOB(LIB_BUILD_DIR "/*.o"), " ");
+    if (CF_FILE_NOT_UTD(CTL_LIB)) {
+        char* objs = CF_JOIN_GLOB(CF_GLOB(CTL_BUILD_DIR "/*.o"), " ");
 
-        printf(AR_TAG "%s\n", LIB);
-        CF_RUN("%s rcs %s %s", CF_ENV(ar), LIB, objs);
+        printf(AR_TAG "%s\n", CTL_LIB);
+        CF_RUN("%s rcs %s %s", CF_ENV(ar), CTL_LIB, objs);
 
-        CF_FILE_MARK_UTD(LIB);
+        CF_FILE_MARK_UTD(CTL_LIB);
+    }
+}
+
+CF_TARGET(
+    agent,
+    CF_WITH_CONFIG(release),
+    CF_DEPENDS(agent_compile),
+    CF_DEPENDS(agent_archive),
+    CF_HELP_STRING("Build agent static library")
+)
+{
+    CF_NOP();
+}
+
+CF_TARGET(agent_compile, CF_HIDDEN)
+{
+    compile_c_dir(AGENT_DIR "/*.c", AGENT_BUILD_DIR);
+}
+
+CF_TARGET(agent_archive, CF_HIDDEN)
+{
+    if (CF_FILE_NOT_UTD(AGENT_LIB)) {
+        char* objs = CF_JOIN_GLOB(CF_GLOB(AGENT_BUILD_DIR "/*.o"), " ");
+
+        printf(AR_TAG "%s\n", AGENT_LIB);
+        CF_RUN("%s rcs %s %s", CF_ENV(ar), AGENT_LIB, objs);
+
+        CF_FILE_MARK_UTD(AGENT_LIB);
     }
 }
 
