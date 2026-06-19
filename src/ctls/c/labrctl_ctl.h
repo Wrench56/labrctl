@@ -1,9 +1,12 @@
 #ifndef LABRCTL_CTL_H
 #define LABRCTL_CTL_H
 
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/time.h>
+#include <sys/types.h>
 
 #define LABRCTL_MAJOR 0
 #define LABRCTL_MINOR 1
@@ -81,10 +84,13 @@ static inline int labrctl_ctl_nop(struct labrctl_ctl_client* c)
 
 static inline int labrctl_ctl_store(
     struct labrctl_ctl_client* c,
+    uint8_t reg,
+    uint8_t off,
     const uint8_t data[8]
 )
 {
-    return labrctl_ctl_command(c, LABRCTL_OP_STORE, NULL, data);
+    const uint8_t arg[2] = { reg, off };
+    return labrctl_ctl_command(c, LABRCTL_OP_STORE, arg, data);
 }
 
 static inline int labrctl_ctl_spawn(
@@ -95,9 +101,19 @@ static inline int labrctl_ctl_spawn(
     return labrctl_ctl_command(c, LABRCTL_OP_SPAWN, arg, NULL);
 }
 
-static inline int labrctl_ctl_kill(struct labrctl_ctl_client* c)
+static inline int labrctl_ctl_kill(
+    struct labrctl_ctl_client* c,
+    int sig,
+    pid_t pid
+)
 {
-    return labrctl_ctl_command(c, LABRCTL_OP_KILL, NULL, NULL);
+    uint8_t arg[2] = { (uint8_t) sig, 0 };
+    uint8_t data[8] = { 0 };
+
+    uint64_t tmp = (uint64_t) pid;
+    memcpy(data, &tmp, sizeof(tmp));
+
+    return labrctl_ctl_command(c, LABRCTL_OP_KILL, arg, data);
 }
 
 #endif // LABRCTL_CTL_H
