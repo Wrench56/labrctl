@@ -26,11 +26,11 @@ static DECLARE_WAIT_QUEUE_HEAD(worker_wq);
 
 __bpf_kfunc_start_defs();
 
-__bpf_kfunc int bpf_labrctl_submit(void* data, __u64 data__sz)
+__bpf_kfunc __u64 bpf_labrctl_submit(void* data, __u64 data__sz)
 {
     const __u8* payload = data;
     if (data__sz < DATA_OFFS + 8) {
-        return -EINVAL;
+        return 0;
     }
 
     __u8 op = READ_ONCE(payload[2]);
@@ -38,6 +38,10 @@ __bpf_kfunc int bpf_labrctl_submit(void* data, __u64 data__sz)
     if (op & LABRCTL_OP_USERSPACE) {
         cctl = ctl;
     } else {
+        if (op == LABRCTL_OP_FETCH) {
+            return op_fetch(payload[3], payload[4], bufferpage);
+        }
+
         cctl = thrd_ctl;
     }
 

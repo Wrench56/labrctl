@@ -13,11 +13,11 @@
 #define ETHHLEN (sizeof(struct ethhdr))
 #define UDPHLEN (sizeof(struct udphdr))
 
-extern int bpf_labrctl_submit(void* data, __u64 data__sz) __ksym;
+extern __u64 bpf_labrctl_submit(void* data, __u64 data__sz) __ksym;
 
 static __u64 seq_seen = 0;
 
-static __always_inline int ack_tx(struct xdp_md* ctx)
+static __always_inline int ack_tx(struct xdp_md* ctx, __u64 data)
 {
     void* packet = (void*) (long) ctx->data;
     void* packet_end = (void*) (long) ctx->data_end;
@@ -54,6 +54,8 @@ static __always_inline int ack_tx(struct xdp_md* ctx)
     udp->check = 0;
 
     pkt->op = LABRCTL_OP_ACK;
+    __builtin_memcpy(pkt->data, &data, sizeof(data));
+
     return XDP_TX;
 }
 
@@ -112,17 +114,17 @@ int xdp_fwd(struct xdp_md* ctx)
 
     if (pkt->op == LABRCTL_OP_RESEQ) {
         __sync_lock_test_and_set(&seq_seen, 0);
-        return ack_tx(ctx);
+        return ack_tx(ctx, 0);
     }
 
     __u64 expected = (__u8) (pkt->seq - 1);
     if (__sync_val_compare_and_swap(&seq_seen, expected, pkt->seq)) {
-        bpf_labrctl_submit(payload, PACKET_SZ);
-        return ack_tx(ctx);
+        __u64 data = bpf_labrctl_submit(payload, PACKET_SZ);
+        return ack_tx(ctx, data);
     }
 
     if ((__u8) expected == pkt->seq) {
-        return ack_tx(ctx);
+        return ack_tx(ctx, 0);
     }
 
     return XDP_DROP;
