@@ -39,7 +39,8 @@ __bpf_kfunc __u64 bpf_labrctl_submit(void* data, __u64 data__sz)
         cctl = ctl;
     } else {
         if (op == LABRCTL_OP_FETCH) {
-            return op_fetch(payload[3], payload[4], bufferpage);
+            __u64* bp = (__u64*) ((__u8*) bufferpage + BREG_START_BYTES);
+            return op_fetch(payload[3], payload[4], bp);
         }
 
         cctl = thrd_ctl;
