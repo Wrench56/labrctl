@@ -35,8 +35,6 @@ class Op(IntEnum):
     GPUSIG2 = 0x82
     GPUSIG3 = 0x83
 
-
-
     _USERSPACE = 0x80
 
     @property
@@ -124,7 +122,7 @@ class LabrctlClient:
         self._log(f"<- {reply}")
         return reply
 
-    def command(self, op: int, arg: bytes = b"\x00\x00", data: bytes = b"\x00" * 8) -> int:
+    def _command_reply(self, op: int, arg: bytes, data: bytes) -> Packet:
         for attempt in range(1, self.retries + 1):
             reply = self._exchange(op, self.seq, arg, data)
             if reply is None:
@@ -135,10 +133,16 @@ class LabrctlClient:
             if reply.seq != (self.seq & 0xFF):
                 self._log(f"   stale ack seq={reply.seq} (want {self.seq & 0xFF}), ignoring")
                 continue
-            acked = self.seq
+
             self.seq = (self.seq + 1) & 0xFF
-            return acked
+            return reply
+
         raise Timeout(f"no ACK for seq={self.seq} after {self.retries} tries")
+
+    def command(self, op: int, arg: bytes = b"\x00\x00", data: bytes = b"\x00" * 8) -> int:
+        seq = self.seq
+        self._command_reply(op, arg, data)
+        return seq
 
     def resync(self, retries: int = 5) -> int:
         old_timeout = self.sock.gettimeout()
@@ -157,25 +161,12 @@ class LabrctlClient:
         raise Timeout("resync failed")
 
     def fetch(self, reg: int, off: int = 0) -> int:
-        arg = bytes([reg & 0xFF, off & 0xFF])
-
-        for attempt in range(1, self.retries + 1):
-            reply = self._exchange(Op.FETCH, self.seq, arg, b"\x00" * 8)
-            if reply is None:
-                self._log(f"   timeout {attempt}/{self.retries}, retransmit seq={self.seq}")
-                continue
-
-            if reply.op != Op.ACK:
-                raise LabrctlError(f"reply op {reply.op:#04x} is not ACK {int(Op.ACK):#04x}")
-
-            if reply.seq != (self.seq & 0xFF):
-                self._log(f"   stale ack seq={reply.seq} (want {self.seq & 0xFF}), ignoring")
-                continue
-
-            self.seq = (self.seq + 1) & 0xFF
-            return int.from_bytes(reply.data, "little")
-
-        raise Timeout(f"no ACK for FETCH seq={self.seq} after {self.retries} tries")
+        reply = self._command_reply(
+            Op.FETCH,
+            bytes([reg & 0xFF, off & 0xFF]),
+            b"\x00" * 8,
+        )
+        return int.from_bytes(reply.data, "little")
 
     def __getattr__(self, name: str):
         try:
