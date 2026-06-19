@@ -29,6 +29,12 @@ class Op(IntEnum):
     SPAWN = 0x03
     KILL = 0x04
     RESEQ = 0x05
+    GPUSIG0 = 0x80
+    GPUSIG1 = 0x81
+    GPUSIG2 = 0x82
+    GPUSIG3 = 0x83
+
+
 
     _USERSPACE = 0x80
 
