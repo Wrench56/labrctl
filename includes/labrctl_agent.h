@@ -13,5 +13,6 @@
 
 const char* labrctl_agent_version(void);
 struct labrctl_ctl* loadctl(void);
+_Bool labrctl_poll(struct labrctl_ctl* ctl, uint64_t* epoch);
 
 #endif // LABRCTL_AGENT_H
