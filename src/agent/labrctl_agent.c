@@ -55,3 +55,14 @@ struct labrctl_ctl* loadctl(void)
 #error "I do not know AARCH, leave me alone"
 #endif
 }
+
+_Bool labrctl_poll(struct labrctl_ctl* ctl, uint64_t* epoch)
+{
+    uint64_t cur = ctl->epoch;
+    if (cur == *epoch) {
+        return 0;
+    }
+
+    *epoch = cur;
+    return 1;
+}
