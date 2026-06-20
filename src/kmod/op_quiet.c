@@ -33,6 +33,44 @@ static char set_numa(char state)
     return ret[0];
 }
 
+static void set_wq_cpumask(
+    const struct cpumask* mask,
+    char* save_buf,
+    size_t save_len
+)
+{
+    loff_t off = 0;
+    char buf[16];
+    struct file* fp = filp_open(
+        "/sys/devices/virtual/workqueue/cpumask",
+        O_RDWR,
+        0644
+    );
+
+    if (IS_ERR(fp)) {
+        return;
+    }
+
+    if (save_buf) {
+        int n = kernel_read(fp, save_buf, save_len - 1, &off);
+        save_buf[n > 0 ? n : 0] = '\0';
+        off = 0;
+    }
+
+    int len = scnprintf(buf, sizeof(buf), "%*pb", cpumask_pr_args(mask));
+    kernel_write(fp, buf, len, &off);
+    filp_close(fp, NULL);
+}
+
+static int str_to_cpumask(const char* buf, struct cpumask* mask)
+{
+    char tmp[16];
+    strscpy(tmp, buf, sizeof(tmp));
+    strim(tmp);
+
+    return cpumask_parse(tmp, mask);
+}
+
 static void set_irq_affinity(const struct cpumask* hk_mask)
 {
     unsigned int irq;
@@ -171,7 +209,9 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
     cpumask_set_cpu(6, hk_mask);
     cpumask_set_cpu(7, hk_mask);
 
-    workqueue_unbound_housekeeping_update(hk_mask);
+    /* Ugly workaround since workqueue_set_unbound_cpumask() is not exported... */
+    set_wq_cpumask(hk_mask, save->wqcpumask, sizeof(save->wqcpumask));
+
     set_irq_affinity(hk_mask);
     push_tasks_away(hk_mask, tmp_mask, user_pid);
 
@@ -195,4 +235,15 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
         struct device* cpud = get_cpu_device(scpu);
         device_online(cpud);
     }
+
+    /* Restore workqueue CPU mask */
+    cpumask_var_t wq_mask;
+    if (!alloc_cpumask_var(&wq_mask, GFP_KERNEL)) {
+        return;
+    }
+
+    if (str_to_cpumask(save->wqcpumask, wq_mask) == 0) {
+        set_wq_cpumask(wq_mask, NULL, 0);
+    }
+    free_cpumask_var(wq_mask);
 }

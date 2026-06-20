@@ -8,6 +8,7 @@
 struct labrctl_quiet_save {
     char numa_state;
     __u16 scpu;
+    char wqcpumask[16];
 } __attribute__((packed));
 
 void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage);
