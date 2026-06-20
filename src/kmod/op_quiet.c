@@ -2,6 +2,7 @@
 
 #include <linux/cpu.h>
 #include <linux/fs.h>
+#include <linux/interrupt.h>
 #include <linux/pid.h>
 #include <linux/topology.h>
 #include <linux/workqueue.h>
@@ -29,6 +30,25 @@ static char set_numa(char state)
 
     filp_close(fp, NULL);
     return ret[0];
+}
+
+static void set_irq_affinity(const struct cpumask* hk_mask)
+{
+    unsigned int irq;
+    struct irq_desc* desc;
+
+    for_each_irq_desc(irq, desc)
+    {
+        if (!desc) {
+            continue;
+        }
+
+        if (!irq_can_set_affinity(irq)) {
+            continue;
+        }
+
+        irq_set_affinity(irq, hk_mask);
+    }
 }
 
 static void push_tasks_away(const struct cpumask* hk_mask, pid_t skip_pid)
@@ -134,6 +154,7 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
     cpumask_set_cpu(7, &hk_mask);
 
     workqueue_unbound_housekeeping_update(&hk_mask);
+    set_irq_affinity(&hk_mask);
     push_tasks_away(&hk_mask, user_pid);
 }
 
