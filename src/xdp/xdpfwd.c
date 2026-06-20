@@ -16,6 +16,7 @@
 extern __u64 bpf_labrctl_submit(void* data, __u64 data__sz) __ksym;
 
 static __u64 seq_seen = 0;
+static int xdp_handle_foreign = XDP_PASS;
 
 static __always_inline int ack_tx(struct xdp_md* ctx, __u64 data)
 {
@@ -114,6 +115,16 @@ int xdp_fwd(struct xdp_md* ctx)
 
     if (pkt->op == LABRCTL_OP_RESEQ) {
         __sync_lock_test_and_set(&seq_seen, 0);
+        return ack_tx(ctx, 0);
+    }
+
+    if (pkt->op == LABRCTL_OP_QUIET_SET) {
+        xdp_handle_foreign = XDP_DROP;
+        return ack_tx(ctx, 0);
+    }
+
+    if (pkt->op == LABRCTL_OP_QUIET_RESTORE) {
+        xdp_handle_foreign = XDP_PASS;
         return ack_tx(ctx, 0);
     }
 
