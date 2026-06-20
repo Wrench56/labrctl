@@ -108,3 +108,7 @@ It is more of an art to choose your experiment CPU. The above help, but there ar
 - isolcpus=managed_irq,domain,cpunum ([explanation](https://access.redhat.com/solutions/480473))
 
 [This guide](https://docs.kernel.org/admin-guide/cpu-isolation.html) can help you understand all of the above.
+
+### What labrctl does
+
+Some experienced Linux users probably noticed that I did not list all useful boot parameters needed for a quiet system. `irqaffinity` being one. labrctl does a few things when you execute the quiet op, including setting `irqaffinity` from within the kernel module. In addition, it disables the NUMA subsystem, it turns off SMT sibling cores of your experiment CPU, puts your experiment task on the selected CPU, pushes all userspace processes to housekeeping cores 0-7, pushes all unbound kernel tasks to houskeeping cores once again. The cleanup is rather primitive. I only restore the previous NUMA state and bring the SMT sibling core back online. I do not redistribute tasks nor do I set IRQ affinities to their previous state. Sorry, I have limited time. A restart of your system should automatically reset these options, so you are not missing out on anything.
