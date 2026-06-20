@@ -30,6 +30,8 @@ class Op(IntEnum):
     FETCH = 0x04
     SPAWN = 0x05
     KILL = 0x06
+    QUIET_SET = 0x07
+    QUIET_RESTORE = 0x08
     GPUSIG0 = 0x80
     GPUSIG1 = 0x81
     GPUSIG2 = 0x82
