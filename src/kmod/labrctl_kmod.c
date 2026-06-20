@@ -20,6 +20,7 @@ static int labrctl_major;
 
 static struct labrctl_ctl* ctl = NULL;
 static struct labrctl_ctl* thrd_ctl = NULL;
+static struct labrctl_quiet_save* quiet_save = NULL;
 
 static struct task_struct* worker_thrd = { 0 };
 static DECLARE_WAIT_QUEUE_HEAD(worker_wq);
@@ -105,6 +106,12 @@ static int worker_fn(void* payload)
             case LABRCTL_OP_KILL:
                 op_kill(ctl, bp);
                 break;
+            case LABRCTL_OP_QUIET_SET:
+                op_quiet_set(ctl, bufferpage);
+                break;
+            case LABRCTL_OP_QUIET_RESTORE:
+                op_quiet_restore(ctl, bufferpage);
+                break;
             default:
                 pr_warn("labrctl: unknown op %u\n", READ_ONCE(ctl->op));
                 break;
@@ -146,6 +153,7 @@ static int __init labrctl_init(void)
 
     ctl = (struct labrctl_ctl*) bufferpage;
     thrd_ctl = ctl + 1;
+    quiet_save = (void*) (thrd_ctl + 1);
 
     /* Dumb Linux legacy convention of calling threads tasks... Why?! */
     worker_thrd = kthread_run(worker_fn, thrd_ctl, "labrctl_worker");
