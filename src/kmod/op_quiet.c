@@ -3,6 +3,7 @@
 #include <linux/cpu.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
+#include <linux/kernel.h>
 #include <linux/pid.h>
 #include <linux/topology.h>
 #include <linux/workqueue.h>
@@ -51,11 +52,14 @@ static void set_irq_affinity(const struct cpumask* hk_mask)
     }
 }
 
-static void push_tasks_away(const struct cpumask* hk_mask, pid_t skip_pid)
+static void push_tasks_away(
+    const struct cpumask* hk_mask,
+    struct cpumask* tmp_mask,
+    pid_t skip_pid
+)
 {
     struct task_struct* g;
     struct task_struct* p;
-    struct cpumask tmp;
 
     read_lock(&tasklist_lock);
     for_each_process_thread(g, p)
@@ -76,15 +80,15 @@ static void push_tasks_away(const struct cpumask* hk_mask, pid_t skip_pid)
             continue;
         }
 
-        cpumask_and(&tmp, p->cpus_ptr, hk_mask);
-        if (cpumask_empty(&tmp)) {
+        cpumask_and(tmp_mask, p->cpus_ptr, hk_mask);
+        if (cpumask_empty(tmp_mask)) {
             continue;
         }
 
         get_task_struct(p);
         read_unlock(&tasklist_lock);
 
-        set_cpus_allowed_ptr(p, &tmp);
+        set_cpus_allowed_ptr(p, tmp_mask);
         put_task_struct(p);
 
         read_lock(&tasklist_lock);
@@ -140,22 +144,39 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
     set_cpus_allowed_ptr(task, cpumask_of(ecpu));
     put_task_struct(task);
 
+    /* NR_CPUS at 8192 is absolutely insane... 
+     * cpumask allocated on the stack overflows the
+     * kernels 1024 byte stack frame limit. You
+     * have to allocate here. Who has 8192 CPUs?!?!
+     */
+    cpumask_var_t hk_mask;
+    if (!alloc_cpumask_var(&hk_mask, GFP_KERNEL)) {
+        return;
+    }
+
+    cpumask_var_t tmp_mask;
+    if (!alloc_cpumask_var(&tmp_mask, GFP_KERNEL)) {
+        free_cpumask_var(hk_mask);
+        return;
+    }
+
     /* Push everything to CPUs 0-7 */
-    struct cpumask hk_mask;
+    cpumask_clear(hk_mask);
+    cpumask_set_cpu(0, hk_mask);
+    cpumask_set_cpu(1, hk_mask);
+    cpumask_set_cpu(2, hk_mask);
+    cpumask_set_cpu(3, hk_mask);
+    cpumask_set_cpu(4, hk_mask);
+    cpumask_set_cpu(5, hk_mask);
+    cpumask_set_cpu(6, hk_mask);
+    cpumask_set_cpu(7, hk_mask);
 
-    cpumask_clear(&hk_mask);
-    cpumask_set_cpu(0, &hk_mask);
-    cpumask_set_cpu(1, &hk_mask);
-    cpumask_set_cpu(2, &hk_mask);
-    cpumask_set_cpu(3, &hk_mask);
-    cpumask_set_cpu(4, &hk_mask);
-    cpumask_set_cpu(5, &hk_mask);
-    cpumask_set_cpu(6, &hk_mask);
-    cpumask_set_cpu(7, &hk_mask);
+    workqueue_unbound_housekeeping_update(hk_mask);
+    set_irq_affinity(hk_mask);
+    push_tasks_away(hk_mask, tmp_mask, user_pid);
 
-    workqueue_unbound_housekeeping_update(&hk_mask);
-    set_irq_affinity(&hk_mask);
-    push_tasks_away(&hk_mask, user_pid);
+    free_cpumask_var(hk_mask);
+    free_cpumask_var(tmp_mask);
 }
 
 void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
