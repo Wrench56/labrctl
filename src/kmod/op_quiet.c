@@ -1,6 +1,7 @@
 #include "ops/op_quiet.h"
 
 #include <linux/cpu.h>
+#include <linux/cpufreq.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -209,6 +210,20 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
 
     free_cpumask_var(hk_mask);
     free_cpumask_var(tmp_mask);
+
+    /* Pin experiment CPU's frequency to MAX */
+    struct cpufreq_policy* policy = cpufreq_cpu_get(ecpu);
+    if (!policy) {
+        return;
+    }
+
+    freq_qos_add_request(
+        &policy->constraints,
+        save->qosreq,
+        FREQ_QOS_MIN,
+        policy->cpuinfo.max_freq
+    );
+    cpufreq_cpu_put(policy);
 }
 
 void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
@@ -237,4 +252,11 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
         set_wq_cpumask(wq_mask, NULL, 0);
     }
     free_cpumask_var(wq_mask);
+
+    /* Restore CPU frequency QOS */
+    if (save->qosreq == NULL) {
+        return;
+    }
+
+    freq_qos_remove_request(save->qosreq);
 }
