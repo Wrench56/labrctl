@@ -74,18 +74,9 @@ static int str_to_cpumask(const char* buf, struct cpumask* mask)
 static void set_irq_affinity(const struct cpumask* hk_mask)
 {
     unsigned int irq;
-    struct irq_desc* desc;
 
-    for_each_irq_desc(irq, desc)
+    for_each_irq_nr(irq)
     {
-        if (!desc) {
-            continue;
-        }
-
-        if (!irq_can_set_affinity(irq)) {
-            continue;
-        }
-
         irq_set_affinity(irq, hk_mask);
     }
 }
@@ -99,7 +90,7 @@ static void push_tasks_away(
     struct task_struct* g;
     struct task_struct* p;
 
-    read_lock(&tasklist_lock);
+    rcu_read_lock();
     for_each_process_thread(g, p)
     {
         if (p == current) {
@@ -124,15 +115,15 @@ static void push_tasks_away(
         }
 
         get_task_struct(p);
-        read_unlock(&tasklist_lock);
+        rcu_read_unlock();
 
         set_cpus_allowed_ptr(p, tmp_mask);
-        put_task_struct(p);
 
-        read_lock(&tasklist_lock);
+        rcu_read_lock();
+        put_task_struct(p);
     }
 
-    read_unlock(&tasklist_lock);
+    rcu_read_unlock();
 }
 
 void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
@@ -154,8 +145,7 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
     for_each_cpu(sib, scpu_mask)
     {
         if (cpu_online(sib) && sib != ecpu) {
-            struct device* cpud = get_cpu_device(sib);
-            device_offline(cpud);
+            remove_cpu(sib);
 
             /*
              * If you have more than 2^16 cores, this is UB...
@@ -166,18 +156,20 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
         }
     }
 
+    /* Move experiment task to experiment CPU */
     __u64 tmp;
     __builtin_memcpy(&tmp, ctl->data, sizeof(tmp));
     int user_pid = (int) tmp;
 
-    rcu_read_lock();
-    struct task_struct* task = find_task_by_vpid(user_pid);
-    if (!task) {
-        rcu_read_unlock();
+    struct pid* pid = find_get_pid(user_pid);
+    if (!pid) {
         return;
     }
-    get_task_struct(task);
-    rcu_read_unlock();
+    struct task_struct* task = get_pid_task(pid, PIDTYPE_PID);
+    put_pid(pid);
+    if (!task) {
+        return;
+    }
 
     set_cpus_allowed_ptr(task, cpumask_of(ecpu));
     put_task_struct(task);
@@ -232,8 +224,7 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
     /* Restore sibling core */
     __u16 scpu = save->scpu;
     if (scpu != 0 && cpu_is_offline(scpu)) {
-        struct device* cpud = get_cpu_device(scpu);
-        device_online(cpud);
+        add_cpu(scpu);
     }
 
     /* Restore workqueue CPU mask */
