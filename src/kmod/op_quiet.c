@@ -135,6 +135,7 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
 
     __u8 ecpu = ctl->arg[0];
     if (!cpu_online(ecpu)) {
+        pr_err("Experiment CPU is offline\n");
         return;
     }
 
@@ -164,11 +165,13 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
 
     struct pid* pid = find_get_pid(user_pid);
     if (!pid) {
+        pr_err("Task PID not found\n");
         return;
     }
     struct task_struct* task = get_pid_task(pid, PIDTYPE_PID);
     put_pid(pid);
     if (!task) {
+        pr_err("Task struct could not be retrieved\n");
         return;
     }
 
@@ -182,12 +185,14 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
      */
     cpumask_var_t hk_mask;
     if (!alloc_cpumask_var(&hk_mask, GFP_KERNEL)) {
+        pr_err("Could not allocate hk_mask\n");
         return;
     }
 
     cpumask_var_t tmp_mask;
     if (!alloc_cpumask_var(&tmp_mask, GFP_KERNEL)) {
         free_cpumask_var(hk_mask);
+        pr_err("Could not allocate tmp_mask\n");
         return;
     }
 
@@ -214,6 +219,7 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
     /* Pin experiment CPU's frequency to MAX */
     struct cpufreq_policy* policy = cpufreq_cpu_get(ecpu);
     if (!policy) {
+        pr_err("Could not retrieve CPU frequency policy\n");
         return;
     }
 
