@@ -131,6 +131,7 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
 {
     struct labrctl_quiet_save* save = (void*) &bufferpage[QSAVE_OFF];
 
+    save->pinned_state = 0;
     save->numa_state = set_numa('0');
 
     __u8 ecpu = ctl->arg[0];
@@ -223,13 +224,15 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
         return;
     }
 
+    /* Pin CPU frequency */
     freq_qos_add_request(
         &policy->constraints,
-        save->qosreq,
+        &save->freqqreq,
         FREQ_QOS_MIN,
         policy->cpuinfo.max_freq
     );
     cpufreq_cpu_put(policy);
+    save->pinned_state |= QF_FREQ;
 }
 
 void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
@@ -260,9 +263,8 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
     free_cpumask_var(wq_mask);
 
     /* Restore CPU frequency QOS */
-    if (save->qosreq == NULL) {
-        return;
+    if (save->pinned_state & QF_FREQ) {
+        freq_qos_remove_request(&save->freqqreq);
     }
 
-    freq_qos_remove_request(save->qosreq);
 }
