@@ -2,6 +2,7 @@
 
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
+#include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -247,6 +248,8 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
     );
     cpufreq_cpu_put(policy);
     save->pinned_state |= QF_FREQ;
+
+    msleep(100);
 }
 
 void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
