@@ -112,3 +112,82 @@ It is more of an art to choose your experiment CPU. The above help, but there ar
 ### What labrctl does
 
 Some experienced Linux users probably noticed that I did not list all useful boot parameters needed for a quiet system. `irqaffinity` being one. labrctl does a few things when you execute the quiet op, including setting `irqaffinity` from within the kernel module. In addition, it disables the NUMA subsystem, it turns off SMT sibling cores of your experiment CPU, puts your experiment task on the selected CPU, pushes all userspace processes to housekeeping cores 0-7, pushes all unbound kernel tasks to houskeeping cores once again. The cleanup is rather primitive. I only restore the previous NUMA state, bring the SMT sibling core back online, and set the workqueue CPU mask back to its original state. I do not redistribute tasks nor do I set IRQ affinities to their previous state. Sorry, I have limited time. A restart of your system should automatically reset these options, so you are not missing out on anything.
+
+### Disabling unnecessary services
+
+What labrctl currently does not do is most of the distribution specific service management. This means disabling GUI, services and more. First of all, Linux deems most of this userspace tasks (which is a somewhat respectable stance). To ensure that you do not run any junk, do the following:
+
+#### Use a GUI-less systemd target
+
+`systemd` is ~~evil~~ popular enough to be used on almost all used Linux distributions. If you chose some eccentric ones, you should be prepared to do these steps by yourself. For anyone else, let's ensure that `systemd` does not start our GUI by running:
+
+```bash
+systemctl set-default multi-user.target
+```
+
+Additionally, if you do not want to set this default and you would like to set this option per-boot, you can do this in a volatile fashion by:
+
+```bash
+systemctl isolate multi-user.target
+```
+
+#### Disable ~~useless~~ services
+
+First, list your services by:
+
+```bash
+systemctl list-units --type=service --state=running
+```
+
+Now you should individually cherry-pick unneeded ones. This usually includes (but is not limited to):
+
+```
+bluetooth \
+cups \
+cups-browsed \
+snapd \
+unattended-upgrades \
+ModemManager \
+anacron \
+cron \
+systemd-oomd \
+wpa_supplicant \
+kerneloops \
+systemd-timesyncd \
+upower
+```
+
+And of course you can stop them (volatile) by:
+
+```bash
+sudo systemctl stop <list>
+```
+
+or disable them (persistent) by:
+
+```bash
+sudo systemctl disable <list>
+```
+
+I would recommend probably a mix of the two...
+
+#### Disable ~~useless~~ user services
+
+Of course we also have to disable user services. The following is a non-comprehensive list:
+
+```bash
+pipewire \
+pipewire.socket \
+pipewire-pulse \
+pipewire-pulse.socket \
+wireplumber \
+snap.snapd-desktop-integration.snapd-desktop-integration \
+xdg-document-portal \
+xdg-permission-store
+```
+
+and you can stop them using:
+
+```bash
+systemctl --user stop <list>
+```
