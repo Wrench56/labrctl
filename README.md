@@ -191,3 +191,21 @@ and you can stop them using:
 ```bash
 systemctl --user stop <list>
 ```
+
+### IRQ Balancer
+
+To avoid the rebalancing of IRQs (pushed off of the experiment CPU), make sure that `irqbalance` is disabled by running:
+
+```bash
+systemctl status irqbalance
+```
+
+### Kernel Same-page Merging (KSM)
+
+Technically, KSM was developed for KVM. However, technically anybody can use it by calling `madvise(2)` with the `MADV_MERGEABLE` flag. This means KSM will actively try to merge your page with others and make it CoW. KSM itself comes with some performance overhead. More importantly, its CoW feature introduces some entropy to the memory bus (and cache), which is generally bad if you want reproducible measurments. Check if it is enabled by running:
+
+```bash
+cat /sys/kernel/mm/ksm/run
+```
+
+where 0 is the disabled state. If not, write `0` to the above file.
