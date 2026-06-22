@@ -9,12 +9,13 @@
 #include <linux/topology.h>
 #include <linux/workqueue.h>
 
-static int kfile_write(const char *path, const char *data, size_t len)
+static int kfile_write(const char* path, const char* data, size_t len)
 {
     loff_t off = 0;
-    struct file *fp = filp_open(path, O_WRONLY, 0);
-    if (IS_ERR(fp))
+    struct file* fp = filp_open(path, O_WRONLY, 0);
+    if (IS_ERR(fp)) {
         return PTR_ERR(fp);
+    }
 
     ssize_t n = kernel_write(fp, data, len, &off);
     filp_close(fp, NULL);
@@ -26,12 +27,13 @@ static int kfile_write(const char *path, const char *data, size_t len)
     return n;
 }
 
-static int kfile_read(const char *path, char *buf, size_t len)
+static int kfile_read(const char* path, char* buf, size_t len)
 {
     loff_t off = 0;
-    struct file *fp = filp_open(path, O_RDONLY, 0);
-    if (IS_ERR(fp))
+    struct file* fp = filp_open(path, O_RDONLY, 0);
+    if (IS_ERR(fp)) {
         return PTR_ERR(fp);
+    }
 
     ssize_t n = kernel_read(fp, buf, len - 1, &off);
     filp_close(fp, NULL);
@@ -66,7 +68,11 @@ static char set_numa(char state)
     return old[0];
 }
 
-static int set_wq_cpumask(const struct cpumask *mask, char *save, size_t save_len)
+static int set_wq_cpumask(
+    const struct cpumask* mask,
+    char* save,
+    size_t save_len
+)
 {
     char buf[16];
     if (save) {
@@ -212,6 +218,20 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
     free_cpumask_var(hk_mask);
     free_cpumask_var(tmp_mask);
 
+    /* Disable CPU Boost mode */
+    if (kfile_read(
+            "/sys/devices/system/cpu/cpufreq/boost",
+            &save->boost,
+            sizeof(save->boost)
+        ) > 0) {
+        kfile_write("/sys/devices/system/cpu/cpufreq/boost", "0", 1);
+        save->pinned_state |= QF_BOOST;
+    }
+
+    /* Disable C-states */
+    cpu_latency_qos_add_request(&save->pmqreq, 0);
+    save->pinned_state |= QF_PM;
+
     /* Pin experiment CPU's frequency to MAX */
     struct cpufreq_policy* policy = cpufreq_cpu_get(ecpu);
     if (!policy) {
@@ -219,11 +239,6 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
         return;
     }
 
-    /* Disable C-states */
-    cpu_latency_qos_add_request(&save->pmqreq, 0);
-    save->pinned_state |= QF_PM;
-
-    /* Pin CPU frequency */
     freq_qos_add_request(
         &policy->constraints,
         &save->freqqreq,
@@ -269,5 +284,14 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
     /* Restore CPU frequency QOS */
     if (save->pinned_state & QF_FREQ) {
         freq_qos_remove_request(&save->freqqreq);
+    }
+
+    /* Restore CPU Boost mode */
+    if (save->pinned_state & QF_BOOST) {
+        kfile_write(
+            "/sys/devices/system/cpu/cpufreq/boost",
+            &save->boost,
+            sizeof(save->boost)
+        );
     }
 }

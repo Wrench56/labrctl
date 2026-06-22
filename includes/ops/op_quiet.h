@@ -9,9 +9,11 @@
 
 #define QF_FREQ (1 << 0)
 #define QF_PM (1 << 1)
+#define QF_BOOST (1 << 2)
 
 struct labrctl_quiet_save {
     char numa_state;
+    char boost;
     __u8 pinned_state;
     __u16 scpu;
     char wqcpumask[16];
