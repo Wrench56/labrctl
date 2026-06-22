@@ -9,58 +9,34 @@
 #include <linux/topology.h>
 #include <linux/workqueue.h>
 
-static char set_numa(char state)
-{
-    loff_t loff = 0;
-    struct file* fp = filp_open(
-        "/proc/sys/kernel/numa_balancing",
-        O_RDWR,
-        0644
-    );
-
-    if (IS_ERR(fp)) {
-        return '?';
-    }
-
-    char ret[1] = { '?' };
-    kernel_read(fp, ret, sizeof(ret), &loff);
-
-    loff = 0;
-    char buf[2] = "0";
-    buf[0] = state;
-    kernel_write(fp, buf, sizeof(buf) - 1, &loff);
-
-    filp_close(fp, NULL);
-    return ret[0];
-}
-
-static void set_wq_cpumask(
-    const struct cpumask* mask,
-    char* save_buf,
-    size_t save_len
-)
+static int kfile_write(const char *path, const char *data, size_t len)
 {
     loff_t off = 0;
-    char buf[16];
-    struct file* fp = filp_open(
-        "/sys/devices/virtual/workqueue/cpumask",
-        O_RDWR,
-        0644
-    );
+    struct file *fp = filp_open(path, O_WRONLY, 0);
+    if (IS_ERR(fp))
+        return PTR_ERR(fp);
 
-    if (IS_ERR(fp)) {
-        return;
-    }
-
-    if (save_buf) {
-        int n = kernel_read(fp, save_buf, save_len - 1, &off);
-        save_buf[n > 0 ? n : 0] = '\0';
-        off = 0;
-    }
-
-    int len = scnprintf(buf, sizeof(buf), "%*pb", cpumask_pr_args(mask));
-    kernel_write(fp, buf, len, &off);
+    ssize_t n = kernel_write(fp, data, len, &off);
     filp_close(fp, NULL);
+
+    if (n == len) {
+        return 0;
+    }
+
+    return n;
+}
+
+static int kfile_read(const char *path, char *buf, size_t len)
+{
+    loff_t off = 0;
+    struct file *fp = filp_open(path, O_RDONLY, 0);
+    if (IS_ERR(fp))
+        return PTR_ERR(fp);
+
+    ssize_t n = kernel_read(fp, buf, len - 1, &off);
+    filp_close(fp, NULL);
+
+    return n;
 }
 
 static int str_to_cpumask(const char* buf, struct cpumask* mask)
@@ -80,6 +56,25 @@ static void set_irq_affinity(const struct cpumask* hk_mask)
     {
         irq_set_affinity(irq, hk_mask);
     }
+}
+
+static char set_numa(char state)
+{
+    char old[2] = { '?', 0 }, neu[2] = { state, 0 };
+    kfile_read("/proc/sys/kernel/numa_balancing", old, sizeof(old));
+    kfile_write("/proc/sys/kernel/numa_balancing", neu, 1);
+    return old[0];
+}
+
+static int set_wq_cpumask(const struct cpumask *mask, char *save, size_t save_len)
+{
+    char buf[16];
+    if (save) {
+        kfile_read("/sys/devices/virtual/workqueue/cpumask", save, save_len);
+    }
+
+    int len = scnprintf(buf, sizeof(buf), "%*pb", cpumask_pr_args(mask));
+    return kfile_write("/sys/devices/virtual/workqueue/cpumask", buf, len);
 }
 
 static void push_tasks_away(
