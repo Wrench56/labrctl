@@ -120,12 +120,10 @@ int xdp_fwd(struct xdp_md* ctx)
 
     if (pkt->op == LABRCTL_OP_QUIET_SET) {
         xdp_handle_foreign = XDP_DROP;
-        return ack_tx(ctx, 0);
     }
 
     if (pkt->op == LABRCTL_OP_QUIET_RESTORE) {
         xdp_handle_foreign = XDP_PASS;
-        return ack_tx(ctx, 0);
     }
 
     __u64 expected = (__u8) (pkt->seq - 1);
