@@ -224,6 +224,10 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
         return;
     }
 
+    /* Disable C-states */
+    cpu_latency_qos_add_request(&save->pmqreq, 0);
+    save->pinned_state |= QF_PM;
+
     /* Pin CPU frequency */
     freq_qos_add_request(
         &policy->constraints,
@@ -262,9 +266,13 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
     }
     free_cpumask_var(wq_mask);
 
+    /* Restore allowance for any C-states */
+    if (save->pinned_state & QF_PM) {
+        cpu_latency_qos_remove_request(&save->pmqreq);
+    }
+
     /* Restore CPU frequency QOS */
     if (save->pinned_state & QF_FREQ) {
         freq_qos_remove_request(&save->freqqreq);
     }
-
 }

@@ -8,12 +8,14 @@
 #define QSAVE_OFF (2 * sizeof(struct labrctl_ctl))
 
 #define QF_FREQ (1 << 0)
+#define QF_PM (1 << 1)
 
 struct labrctl_quiet_save {
     char numa_state;
     __u8 pinned_state;
     __u16 scpu;
     char wqcpumask[16];
+    struct pm_qos_request pmqreq;
     struct freq_qos_request freqqreq;
 };
 
