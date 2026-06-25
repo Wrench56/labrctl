@@ -133,6 +133,11 @@ void op_quiet_set(struct labrctl_ctl* ctl, __u8* bufferpage)
 {
     struct labrctl_quiet_save* save = (void*) &bufferpage[QSAVE_OFF];
 
+    if (save->pinned_state) {
+        pr_warn("labrctl: QUIET mode already active\n");
+        op_quiet_restore(ctl, bufferpage);
+    }
+
     save->pinned_state = 0;
     save->numa_state = set_numa('0');
 
@@ -297,4 +302,6 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
             sizeof(save->boost)
         );
     }
+
+    pr_info("labrctl: Exiting QUIET mode\n");
 }
