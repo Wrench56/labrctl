@@ -303,5 +303,6 @@ void op_quiet_restore(struct labrctl_ctl* ctl, __u8* bufferpage)
         );
     }
 
+    save->pinned_state = 0;
     pr_info("labrctl: Exiting QUIET mode\n");
 }
