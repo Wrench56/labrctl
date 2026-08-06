@@ -23,14 +23,33 @@ static __always_inline int ack_tx(struct xdp_md* ctx, __u64 data)
     void* packet = (void*) (long) ctx->data;
     void* packet_end = (void*) (long) ctx->data_end;
 
-    struct ethhdr* eth = packet;
-    if ((void*) (eth + 1) > packet_end) {
-        return XDP_DROP;
+    struct iphdr* iph;
+#if TAILSCALE_IFINDEX != 0
+    if (ctx->ingress_ifindex == TAILSCALE_IFINDEX) {
+        iph = (struct iphdr*) packet;
+        if ((void*) (iph + 1) > packet_end) {
+            return XDP_DROP;
+        }
+    } else {
+#endif
+        struct ethhdr* eth = packet;
+        if ((void*) (eth + 1) > packet_end) {
+            return XDP_DROP;
+        }
+
+        iph = (struct iphdr*) (eth + 1);
+        if ((void*) (iph + 1) > packet_end) {
+            return XDP_DROP;
+        }
+
+        __u8 mac[ETH_ALEN];
+        __builtin_memcpy(mac, eth->h_source, ETH_ALEN);
+        __builtin_memcpy(eth->h_source, eth->h_dest, ETH_ALEN);
+        __builtin_memcpy(eth->h_dest, mac, ETH_ALEN);
+#if TAILSCALE_IFINDEX != 0
     }
-    struct iphdr* iph = (struct iphdr*) (eth + 1);
-    if ((void*) (iph + 1) > packet_end) {
-        return XDP_DROP;
-    }
+#endif
+
     struct udphdr* udp = (struct udphdr*) (iph + 1);
     if ((void*) (udp + 1) > packet_end) {
         return XDP_DROP;
@@ -39,11 +58,6 @@ static __always_inline int ack_tx(struct xdp_md* ctx, __u64 data)
     if ((void*) (pkt + 1) > packet_end) {
         return XDP_DROP;
     }
-
-    __u8 mac[ETH_ALEN];
-    __builtin_memcpy(mac, eth->h_source, ETH_ALEN);
-    __builtin_memcpy(eth->h_source, eth->h_dest, ETH_ALEN);
-    __builtin_memcpy(eth->h_dest, mac, ETH_ALEN);
 
     __be32 ip = iph->saddr;
     iph->saddr = iph->daddr;
@@ -66,21 +80,40 @@ int xdp_fwd(struct xdp_md* ctx)
     void* packet = (void*) (long) ctx->data;
     void* packet_end = (void*) (long) ctx->data_end;
 
-    /* Strict check, needs VLAN stripping and no IP options */
-    if (packet_end - packet != 60) {
-        return XDP_PASS;
-    }
+    /*
+     * Tailscale sends packets on their own interface,
+     * usually called tailscale0. Since this is not TAP but
+     * instead a TUN interface, you don't have an ethernet header.
+     */
+    struct iphdr* iph;
+#if TAILSCALE_IFINDEX != 0
+    if (ctx->ingress_ifindex == TAILSCALE_IFINDEX) {
+        if (packet_end - packet != 60 - ETHHLEN) {
+            return XDP_PASS;
+        }
 
-    struct ethhdr* eth = packet;
-    if ((void*) (eth + 1) > packet_end) {
-        return XDP_PASS;
-    }
+        iph = (struct iphdr*) packet;
+    } else {
+#endif
+        /* Strict check, needs VLAN stripping and no IP options */
+        if (packet_end - packet != 60) {
+            return XDP_PASS;
+        }
 
-    if (eth->h_proto != bpf_htons(ETH_P_IP)) {
-        return XDP_PASS;
-    }
+        struct ethhdr* eth = packet;
+        if ((void*) (eth + 1) > packet_end) {
+            return XDP_PASS;
+        }
 
-    struct iphdr* iph = (struct iphdr*) (packet + ETHHLEN);
+        if (eth->h_proto != bpf_htons(ETH_P_IP)) {
+            return XDP_PASS;
+        }
+
+        iph = (struct iphdr*) (packet + ETHHLEN);
+#if TAILSCALE_IFINDEX != 0
+    }
+#endif
+
     if ((void*) (iph + 1) > packet_end) {
         return XDP_PASS;
     }
@@ -90,7 +123,7 @@ int xdp_fwd(struct xdp_md* ctx)
     }
 
     __u16 iph_len = iph->ihl * 4;
-    struct udphdr* udp = (struct udphdr*) (packet + ETHHLEN + iph_len);
+    struct udphdr* udp = (struct udphdr*) ((void*) iph + iph_len);
     if ((void*) (udp + 1) > packet_end) {
         return XDP_PASS;
     }

@@ -1,7 +1,10 @@
 #include "cforge.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include <net/if.h>
 
 #define CC_TAG "[" CF_YELLOW "CC" CF_RESET "] "
 #define AR_TAG "[" CF_GREEN "AR" CF_RESET "] "
@@ -39,8 +42,21 @@ CF_CONFIG(bpf)
         "-g "
         "-target bpf "
         "-Wall -Wextra "
-        "-Iincludes"
+        "-Iincludes "
     );
+
+    uint32_t ifidx = if_nametoindex("tailscale0");
+    if (ifidx == 0) {
+        fprintf(
+            stderr,
+            "Warning: tailscale0 network interface could not be "
+            "found!\nTailscale support has been disabled!\n"
+        );
+    }
+
+    char mdef[64];
+    snprintf(mdef, sizeof(mdef), "-DTAILSCALE_IFINDEX=%u", ifidx);
+    CF_APPEND_ENV(bpfflags, mdef);
 }
 
 CF_CONFIG(base)
