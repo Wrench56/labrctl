@@ -195,6 +195,10 @@ static void __exit labrctl_exit(void)
     unregister_chrdev(labrctl_major, LABRCTL_DEVNAME);
 
     kthread_stop(worker_thrd);
+    if (quiet_save->pinned_state) {
+        op_quiet_restore(ctl, bufferpage);
+    }
+
     free_bufferpage();
 
     pr_info("labrctl: Module unloaded successfully\n");
