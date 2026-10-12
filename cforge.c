@@ -43,6 +43,7 @@ CF_CONFIG(bpf)
         "-target bpf "
         "-Wall -Wextra "
         "-Iincludes "
+        "-idirafter /usr/include/x86_64-linux-gnu "
     );
 
     uint32_t ifidx = if_nametoindex("tailscale0");
