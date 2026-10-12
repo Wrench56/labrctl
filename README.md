@@ -1,5 +1,35 @@
 # librctl
 
+## Installation
+
+### Install Prerequisites
+
+Headers, compilers, linkers, and BTF stuff.
+
+```bash
+sudo apt install -y \
+    build-essential clang llvm lld \
+    dwarves \
+    libbpf-dev linux-libc-dev \
+    "linux-headers-$(uname -r)"
+```
+
+### Add symlink to vmlinux
+
+For reasons unknown to me, Debian does not automatically put vmlinux into the `/usr/src/linux-headers-$(uname -r)` directory so BTF ID resolution silently fails. It is fairly simple to verify this once you know what you are looking for:
+
+```bash
+$ readelf -S libs/labrctl/build/labrctl.ko | grep "BTF"
+  [21] .BTF_ids          PROGBITS         0000000000000000  00001ed0
+  [56] .BTF              PROGBITS         0000000000000000  000815e2
+```
+
+This is a correct build, since the BTF IDs have been resolved and a BTF section appeared. Had it silently failed, the `.BTF` would be missing. To not have this issue, simply symlink the shipped `vmlinux` from the `/sys` pseudo-filesystem to the current Linux headers directory:
+
+```bash
+sudo ln -sf /sys/kernel/btf/vmlinux /usr/src/linux-headers-$(uname -r)/vmlinux
+```
+
 ## Guide to a Good Setup
 
 ### Finding the right CPU
