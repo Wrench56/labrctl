@@ -1,5 +1,6 @@
 #include <linux/bpf.h>
 #include <linux/btf.h>
+#include <linux/btf_ids.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -62,6 +63,12 @@ __bpf_kfunc __u64 bpf_labrctl_submit(void* data, __u64 data__sz)
 }
 
 __bpf_kfunc_end_defs();
+
+/* Linux 6.8 has a different BTF interface... gotta love Linux */
+#ifndef BTF_KFUNCS_START
+#define BTF_KFUNCS_START(name) BTF_SET8_START(name)
+#define BTF_KFUNCS_END(name) BTF_SET8_END(name)
+#endif
 
 BTF_KFUNCS_START(labrctl_kfunc_ids);
 BTF_ID_FLAGS(func, bpf_labrctl_submit);
